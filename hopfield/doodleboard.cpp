@@ -29,22 +29,6 @@ namespace {
         int a = rand() % 255, b = rand() % 255, c = rand() % 255;
         return qRgb(a, b, c);
     }
-    std::vector<double> getVector(const QImage& image) {
-        std::vector<double> collect;
-        QRgb *oneLine = nullptr;
-        const int height = image.height ();
-        for(int i = 0;i < height; ++i) {
-            oneLine = (QRgb*)image.scanLine (i);
-            const int width = image.width ();
-            for(int j = 0;j < width; ++j) {
-                if(qRed(oneLine[j]) == 0 || qGreen (oneLine[j] == 0 || qBlue (oneLine[j]) == 0))
-                    collect.emplace_back(1);
-                else
-                    collect.emplace_back(0);
-            }
-        }
-        return collect;
-    }
 
     QImage getImage(const QImage& image, const std::vector<QPoint>& travels) {
         int left = 1e5;
@@ -200,6 +184,7 @@ void doodleBoard::on_clear_button_clicked()
     lastPoint.setX (0); lastPoint.setY (0);
     endPoint.setX (0); endPoint.setY (0);
     this->travels.clear ();
+    ui->result->clear ();
 }
 
 void doodleBoard::on_recognize_clicked()
@@ -218,19 +203,16 @@ void doodleBoard::on_train_button_clicked()
     if(this->being_trained == true) {
         logCall ("网络正在训练中"); return;
     }
-    auto one = std::make_unique<Hopfield>();
+    auto one = std::make_unique<Hopfield>(784);
     assert (one);
     one.swap(this->hopfield);
     this->trained = false;
     this->being_trained = true;
     this->trainThread = std::thread([&]{
-//        QString path = "./dataSet/9.23.png";
-//        QImage image(path);
-//        QImage handled = getHandled (image).scaled (28, 28);
-//        handled.save ("sample.png");
-//        auto input = getVector (handled);
+        this->hopfield->train ();
         this->trained = true;
         this->being_trained = false;
+        // logCall ("训练完毕 !");
     });
     this->trainThread.detach ();
 }
@@ -249,9 +231,8 @@ void doodleBoard::runBP()
     QImage image("./result.png");
     auto handled = getImage (image, this->travels).scaled (28, 28);
     handled.save ("./handled.png");
-
-    QString oneFlock = "";
-    ui->result->setText (oneFlock);
+    auto ans = this->hopfield->recognize (handled);
+    ui->result->setText (QString::number (ans));
 }
 
 void doodleBoard::on_set_button_clicked()
